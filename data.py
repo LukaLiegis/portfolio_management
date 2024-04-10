@@ -12,6 +12,7 @@ def get_data(ticker):
         "Volume": "volume"
     })
     df["datetime"] = df["datetime"].dt.tz_convert(pytz.utc)
+    # Calculate the percent change os the close data
     df["returns"] = df["close"].pct_change()
     df = df.drop(columns=["Dividends", "Stock Splits"])
     df = df.set_index("datetime", drop = True)
