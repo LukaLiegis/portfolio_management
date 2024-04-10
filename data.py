@@ -16,5 +16,6 @@ def get_data(ticker):
     df["returns"] = df["close"].pct_change()
     df = df.drop(columns=["Dividends", "Stock Splits"])
     df = df.set_index("datetime", drop = True)
+    df = df.dropna() 
     print("The size of ", ticker, "is ", df.shape)
     return df
