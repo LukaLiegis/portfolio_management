@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-def size_proportions(alphas, idio_vol, factor_betas, target_gmv,
+def size_positions(alphas, idio_vol, factor_betas, target_gmv,
                      sizing_method = 'proportional', risk_aversion = 1.0):
 
     common_tickers = list(set(factor_betas.index) &
