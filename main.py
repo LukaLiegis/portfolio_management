@@ -1,59 +1,143 @@
-from data import get_data
-from alpha import estimate_alphas
-from config import STOCKS, BENCHMARKS
-from backtest import backtest_portfolio
-from portfolio import construct_portfolio
-from attribution import perform_attribution
-from factor_model import create_factor_model
-from plotting import visualize_portfolio, visualize_performance
+import polars as pl
+from pathlib import Path
+
+from src.data import load_and_process_data
+from src.factors import factor_mom, factor_size, factor_value, factor_quality
+from src.risk_model import build_biotech_risk_model
+from src.portfolio import construct_biotech_portfolio
+from src.backtest import backtest_strategy
+from src.attribution import perform_attribution
+from src.plotting import (
+    plot_factor_exposures,
+    plot_risk_decomposition,
+    create_performance_report
+)
 
 
-def run_analysis(stocks, start_date, end_date, benchmark, target_gmv, sizing_method,
-                 max_factor_exposure, max_stock_weight):
-
-    price_data, returns_data, market_cap, momentum = get_data(start_date, end_date, stocks,  benchmark)
-
-    factor_betas, idio_vol, factor_r2 = create_factor_model(stocks, returns_data)
-
-    alphas = estimate_alphas(stocks, returns_data)
-
-    portfolio, portfolio_stats = construct_portfolio(
-        alphas, factor_betas, idio_vol, target_gmv, sizing_method, max_factor_exposure, max_stock_weight
+def run_biotech_portfolio_system(
+        stock_files,
+        factor_file,
+        start_date,
+        end_date,
+        initial_capital=10_000_000,
+        rebalance_frequency=21,
+        max_position=0.15,
+        output_dir="./output"
+):
+    """
+    Run the complete biotech portfolio management system.
+    """
+    print("Loading and processing data...")
+    stocks_data, factors_data = load_and_process_data(
+        stock_files, factor_file, start_date, end_date
     )
 
-    backtest_stats, backtest_returns = backtest_portfolio(portfolio, returns_data, benchmark)
+    # Create directory for outputs
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True, parents=True)
 
-    attribution = perform_attribution(portfolio_stats, backtest_returns)
+    print("Calculating factor scores...")
+    # Calculate factor scores
+    returns_data = calculate_returns(stocks_data)
 
-    visualize_portfolio(portfolio, portfolio_stats)
-    visualize_performance(backtest_stats, backtest_returns, attribution)
+    mom_scores = factor_mom(returns_data)
+    size_scores = factor_size(stocks_data)
+    value_scores = factor_value(stocks_data)
+    quality_scores = factor_quality(stocks_data, returns_data)
 
-    print("\nPortfolio Summary:")
-    print("-----------------")
-    print(f"GMV: ${portfolio_stats['gmv']:,.2f}")
-    print(f"Market Exposure: {portfolio_stats['market_exposure_pct']:.2%}")
-    print(f"Idiosyncratic Volatility: {portfolio_stats['idio_volatility']:,.2f}")
-    print(f"Total Volatility: {portfolio_stats['total_volatility']:,.2f}")
-    print(f"% Idiosyncratic Variance: {portfolio_stats['pct_idio_var']:.2%}")
-    print(f"Expected Return (based on alpha): {portfolio_stats['expected_return']:,.2f}")
+    # Combine factor scores
+    factor_scores = (
+        mom_scores
+        .join(size_scores, on=["date", "symbol"])
+        .join(value_scores, on=["date", "symbol"])
+        .join(quality_scores, on=["date", "symbol"])
+    )
 
-    print("\nBacktest Performance:")
-    print("---------------------")
-    print(f"Annualized Return: {backtest_stats['annualized_return']:.2%}")
-    print(f"Annualized Volatility: {backtest_stats['annualized_vol']:.2%}")
-    print(f"Sharpe Ratio: {backtest_stats['sharpe_ratio']:.2f}")
-    print(f"Information Ratio: {backtest_stats['information_ratio']:.2f}")
+    print("Building risk model...")
+    # Build risk model
+    exposures, factor_cov, specific_risk = build_biotech_risk_model(
+        returns_data, factors_data, stocks_data.select("market_cap")
+    )
 
-    return portfolio, portfolio_stats, backtest_stats
+    # Define strategy function for backtesting
+    def biotech_strategy(current_stocks, current_factors, current_date):
+        """Strategy function that generates positions for a given date."""
+        # Get latest factor scores
+        latest_scores = factor_scores.filter(pl.col("date") <= current_date).sort("date").group_by("symbol").last()
+
+        # Create alpha signal from factor scores
+        alphas = (
+                latest_scores["mom_score"] * 0.3 +
+                latest_scores["size_score"] * 0.2 +
+                latest_scores["value_score"] * 0.3 +
+                latest_scores["quality_score"] * 0.2
+        )
+
+        # Get latest risk model data
+        # Simplified for explanation - would need proper time filtering
+        latest_exposures = exposures
+        latest_factor_cov = factor_cov
+        latest_specific_risk = specific_risk
+
+        # Construct portfolio
+        positions, stats = construct_biotech_portfolio(
+            alphas,
+            latest_exposures,
+            latest_factor_cov,
+            latest_specific_risk,
+            initial_capital,
+            max_position
+        )
+
+        return positions, stats
+
+    print("Running backtest...")
+    # Run backtest
+    backtest_results = backtest_strategy(
+        initial_capital,
+        stocks_data,
+        factors_data,
+        biotech_strategy,
+        rebalance_frequency,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    print("Performing attribution analysis...")
+    # Perform attribution
+    attribution_results = perform_attribution(
+        backtest_results[-1]["positions"],
+        exposures,
+        factors_data,
+        returns_data.filter(pl.col("date") > backtest_results[-1]["date"]),
+        stocks_data.select("symbol").unique()
+    )
+
+    print("Generating reports...")
+    # Create visualizations
+    factor_plot = plot_factor_exposures([r["portfolio_stats"] for r in backtest_results if "portfolio_stats" in r])
+    factor_plot.savefig(output_path / "factor_exposures.png")
+
+    risk_plot = plot_risk_decomposition([r["portfolio_stats"] for r in backtest_results if "portfolio_stats" in r])
+    risk_plot.savefig(output_path / "risk_decomposition.png")
+
+    perf_report = create_performance_report(backtest_results, attribution_results)
+    perf_report.savefig(output_path / "performance_report.png")
+
+    print(f"Analysis complete. Results saved to {output_path}")
+
+    return backtest_results, attribution_results
+
 
 if __name__ == "__main__":
-    portfolio, portfolio_stats, backtest_stats = run_analysis(
-        stocks = STOCKS,
-        benchmark = BENCHMARKS,
-        start_date = '2010-01-01',
-        end_date = '2024-12-31',
-        target_gmv=1000000,  # $1M portfolio
-        sizing_method='proportional',
-        max_factor_exposure=0.2,  # 20% max market exposure
-        max_stock_weight=0.15,  # 15% max position size
+    # Example usage
+    run_biotech_portfolio_system(
+        stock_files=["vrtx_example.csv"],
+        factor_file="example.csv",
+        start_date="2020-01-01",
+        end_date="2023-12-31",
+        initial_capital=10_000_000,
+        rebalance_frequency=21,
+        max_position=0.15,
+        output_dir="./biotech_portfolio_results"
     )
