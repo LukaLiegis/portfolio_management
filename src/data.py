@@ -1,7 +1,7 @@
 import polars as pl
 
 
-def load_and_process_data(stock_files, factor_file, start_date, end_date):
+def load_and_process_data(stock_files, factor_file):
     """
     Load and process stock and factor data using polars for performance.
     """
