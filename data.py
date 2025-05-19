@@ -1,17 +1,13 @@
 import pandas as pd
 import yfinance as yf
 
-from config import STOCKS, BENCHMARKS
-
-def get_data(start_date, end_date):
-    '''
+def get_data(start_date: str, end_date: str, stocks: list, benchmarks: list):
+    """
     Fetch historical data for stocks and benchmarks.
-    :param ticker:
-    :return:
-    '''
+    """
     print('Fetching historical data...')
 
-    all_tickers = STOCKS + BENCHMARKS
+    all_tickers = stocks + benchmarks
 
     df = yf.download(tickers=all_tickers, start_date = start_date, end_date = end_date)['Close']
     price_data = df.fillna(method='ffill')
