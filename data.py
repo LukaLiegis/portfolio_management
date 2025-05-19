@@ -9,7 +9,7 @@ def get_data(start_date: str, end_date: str, stocks: list, benchmarks: list):
 
     all_tickers = stocks + benchmarks
 
-    df = yf.download(tickers=all_tickers, start_date = start_date, end_date = end_date)['Close']
+    df = yf.download(tickers=all_tickers, start = start_date, end = end_date)['Close']
     price_data = df.fillna(method='ffill')
 
     returns_data = price_data.pct_change().dropna()

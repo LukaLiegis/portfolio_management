@@ -4,9 +4,18 @@ from sizing import size_positions
 from remove_risk import neutralize_factor_risk
 
 
-def construct_portfolio(alphas, factor_betas, idio_vol, target_gmv,
-                        sizing_method, max_factor_exposure,
-                        max_stock_weight):
+def construct_portfolio(
+        alphas: pd.Series,
+        factor_betas: pd.Series,
+        idio_vol: pd.Series,
+        target_gmv: float,
+        sizing_method: str,
+        max_factor_exposure: float,
+        max_stock_weight: float,
+):
+    """
+    Construct portfolio with constraints.
+    """
     print("Constructing portfolio...")
 
     # Size positions based on alphas
