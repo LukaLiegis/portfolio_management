@@ -3,13 +3,15 @@ import numpy as np
 import cvxpy as cp
 
 
-def construct_biotech_portfolio(
+def construct_portfolio(
         alphas,
         factor_exposures,
         factor_covariance,
         specific_risk,
-        target_gmv: int =1_000_000,
-        max_position: float =0.15,
+        target_gmv: int = 1_000_000,
+        max_position: float = 0.15,
+        max_vol: float = 0.15,  # Adding the missing parameter
+        risk_aversion: float = 1.0,
         factor_constraints=None
 ):
     """
@@ -87,3 +89,25 @@ def construct_biotech_portfolio(
     }
 
     return positions, portfolio_stats
+
+
+def calculate_returns(stocks_data: pl.DataFrame) -> pl.DataFrame:
+
+    if "asset_returns" in stocks_data.columns:
+        return stocks_data
+
+    # Find a suitable price column
+    price_cols = [col for col in stocks_data.columns if col in ["prccd", "price", "close", "adj_close"]]
+
+    if not price_cols:
+        raise ValueError("No suitable price column found to calculate returns")
+
+    price_col = price_cols[0]
+
+    returns_df = stocks_data.with_columns(
+        (pl.col(price_col) / pl.col(price_col).shift(1).over("symbol") - 1).alias("asset_returns")
+    )
+
+    returns_df = returns_df.filter(pl.col("asset_returns").is_not_null())
+
+    return returns_df

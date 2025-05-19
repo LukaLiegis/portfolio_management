@@ -3,8 +3,8 @@ from pathlib import Path
 
 from src.data import load_and_process_data
 from src.factors import factor_mom, factor_size, factor_value, factor_quality
-from src.risk_model import build_biotech_risk_model
-from src.portfolio import construct_biotech_portfolio
+from src.risk_model import build_risk_model
+from src.portfolio import construct_portfolio, calculate_returns
 from src.backtest import backtest_strategy
 from src.attribution import perform_attribution
 from src.plotting import (
@@ -14,7 +14,7 @@ from src.plotting import (
 )
 
 
-def run_biotech_portfolio_system(
+def run_portfolio_system(
         stock_files,
         factor_file,
         start_date,
@@ -55,7 +55,7 @@ def run_biotech_portfolio_system(
 
     print("Building risk model...")
     # Build risk model
-    exposures, factor_cov, specific_risk = build_biotech_risk_model(
+    exposures, factor_cov, specific_risk = build_risk_model(
         returns_data, factors_data, stocks_data.select("market_cap")
     )
 
@@ -80,7 +80,7 @@ def run_biotech_portfolio_system(
         latest_specific_risk = specific_risk
 
         # Construct portfolio
-        positions, stats = construct_biotech_portfolio(
+        positions, stats = construct_portfolio(
             alphas,
             latest_exposures,
             latest_factor_cov,
@@ -92,7 +92,6 @@ def run_biotech_portfolio_system(
         return positions, stats
 
     print("Running backtest...")
-    # Run backtest
     backtest_results = backtest_strategy(
         initial_capital,
         stocks_data,
@@ -104,7 +103,6 @@ def run_biotech_portfolio_system(
     )
 
     print("Performing attribution analysis...")
-    # Perform attribution
     attribution_results = perform_attribution(
         backtest_results[-1]["positions"],
         exposures,
@@ -114,7 +112,6 @@ def run_biotech_portfolio_system(
     )
 
     print("Generating reports...")
-    # Create visualizations
     factor_plot = plot_factor_exposures([r["portfolio_stats"] for r in backtest_results if "portfolio_stats" in r])
     factor_plot.savefig(output_path / "factor_exposures.png")
 
@@ -130,14 +127,13 @@ def run_biotech_portfolio_system(
 
 
 if __name__ == "__main__":
-    # Example usage
-    run_biotech_portfolio_system(
+    run_portfolio_system(
         stock_files=["vrtx_example.csv"],
-        factor_file="example.csv",
-        start_date="2020-01-01",
-        end_date="2023-12-31",
+        factor_file="data/w1fs4jrazjijad60.csv.gz",
+        start_date="2000-01-01",
+        end_date="2024-12-31",
         initial_capital=10_000_000,
         rebalance_frequency=21,
         max_position=0.15,
-        output_dir="./biotech_portfolio_results"
+        output_dir="./portfolio_results"
     )

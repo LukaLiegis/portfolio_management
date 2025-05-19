@@ -2,8 +2,8 @@ import polars as pl
 import numpy as np
 
 
-def build_biotech_risk_model(stock_returns, factor_returns, mcaps):
-    
+def build_risk_model(stock_returns, factor_returns, mcaps):
+
     stock_returns_np = stock_returns.to_numpy()
     factor_returns_np = factor_returns.to_numpy()
 
