@@ -1,7 +1,19 @@
-# portfolio_management
+# Sector Rotation Strategy with Risk-Based Portfolio Construction
 
-This started with me applying concepts from Advanced Potfolio Management, but has turned into something much bigger.
+This project implements a multi-factor sector rotation strategy with sophisticated risk management.
+The strategy allocates capital across U.S. equity sectors based on a combination of:
+1. Macroeconomic regime indicators
+2. Technical momentum signals
+3. Relative value metrics
+4. Risk-based portfolio construction
 
-### Source
+The implementation includes realistic transaction costs, proper risk decomposition,
+and adaptive position sizing based on volatility regimes.
 
-Finding beta with linear regression: https://youtu.be/jmKfDvk4k6g?si=0DpgCRV1xLhZky7v
+## Main Features:
+- Factor-based sector selection
+- Risk-based portfolio construction
+- Volatility targeting
+- Transaction cost modeling
+- Performance attribution (factor vs. idiosyncratic)
+- Realistic backtesting with proper constraints
